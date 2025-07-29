@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Send, Mic, MicOff } from 'lucide-react';
+import { Send, Mic, MicOff, AlertCircle } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useToast } from '../../hooks/useToast';
 import { v4 as uuidv4 } from 'uuid';
@@ -12,7 +12,24 @@ const NotesPanel: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Verificar se as seleções obrigatórias foram feitas
+  const hasRequiredSelections = () => {
+    const hasLocation = state.selectedLocation && state.selectedLocation.trim() !== '';
+    const hasAction = state.selectedAction && state.selectedAction.trim() !== '';
+    return hasLocation && hasAction;
+  };
+
   const handleVoiceRecording = () => {
+    // Verificar seleções antes de permitir gravação
+    if (!hasRequiredSelections()) {
+      const missing = [];
+      if (!state.selectedLocation) missing.push('LOCAL');
+      if (!state.selectedAction) missing.push('AÇÃO');
+      
+      warning('Seleções obrigatórias', `Selecione ${missing.join(' e ')} antes de gravar!`);
+      return;
+    }
+
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
       const recognition = new SpeechRecognition();
@@ -45,11 +62,40 @@ const NotesPanel: React.FC = () => {
     }
   };
 
+  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNotes(e.target.value);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       console.log('🎯 Enter pressionado, chamando handleSubmit');
       handleSubmit();
+    }
+  };
+
+  const handleTextareaFocus = () => {
+    if (!hasRequiredSelections()) {
+      const missing = [];
+      if (!state.selectedLocation) missing.push('LOCAL');
+      if (!state.selectedAction) missing.push('AÇÃO');
+      
+      warning('Seleções obrigatórias', `Selecione ${missing.join(' e ')} antes de digitar!`);
+      
+      // Remove o foco do textarea
+      if (textareaRef.current) {
+        textareaRef.current.blur();
+      }
+    }
+  };
+
+  const handleTextareaClick = () => {
+    if (!hasRequiredSelections()) {
+      const missing = [];
+      if (!state.selectedLocation) missing.push('LOCAL');
+      if (!state.selectedAction) missing.push('AÇÃO');
+      
+      warning('Seleções obrigatórias', `Selecione ${missing.join(' e ')} antes de digitar!`);
     }
   };
 
@@ -63,23 +109,16 @@ const NotesPanel: React.FC = () => {
       selectedTags: state.selectedTags
     });
 
-    if (!notes.trim()) return;
-
-    console.log('🔄 Tentando enviar log:', {
-      notes: notes.trim(),
-      selectedLocation: state.selectedLocation,
-      selectedAction: state.selectedAction,
-      selectedParticipants: state.selectedParticipants
-    });
+    if (!notes.trim()) {
+      warning('Campo obrigatório', 'Digite algo antes de enviar!');
+      return;
+    }
 
     // Verificar se tem seleções obrigatórias
-    const hasLocation = state.selectedLocation && state.selectedLocation.trim() !== '';
-    const hasAction = state.selectedAction && state.selectedAction.trim() !== '';
-    
-    if (!hasLocation || !hasAction) {
+    if (!hasRequiredSelections()) {
       const missing = [];
-      if (!hasLocation) missing.push('Local');
-      if (!hasAction) missing.push('Ação');
+      if (!state.selectedLocation) missing.push('Local');
+      if (!state.selectedAction) missing.push('Ação');
       
       warning('Seleções obrigatórias', `Selecione: ${missing.join(' e ')} antes de enviar!`);
       return;
@@ -110,54 +149,97 @@ const NotesPanel: React.FC = () => {
       if (textareaRef.current) {
         textareaRef.current.focus();
       }
-    } catch (error) {
-      console.error('❌ Erro ao adicionar log:', error);
-      error('Erro ao salvar', `Não foi possível salvar a entrada: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } catch (err: any) {
+      console.error('❌ Erro ao adicionar log:', err);
+      error('Erro ao salvar', `Não foi possível salvar a entrada: ${err.message || 'Erro desconhecido'}`);
     } finally {
       setLoading(false);
     }
   };
 
+  const getSelectionStatus = () => {
+    const hasLocation = state.selectedLocation && state.selectedLocation.trim() !== '';
+    const hasAction = state.selectedAction && state.selectedAction.trim() !== '';
+    
+    if (hasLocation && hasAction) {
+      return { status: 'ready', message: 'Pronto para digitar!' };
+    } else {
+      const missing = [];
+      if (!hasLocation) missing.push('Local');
+      if (!hasAction) missing.push('Ação');
+      return { status: 'waiting', message: `Selecione: ${missing.join(' e ')}` };
+    }
+  };
+
+  const selectionStatus = getSelectionStatus();
+  const canType = selectionStatus.status === 'ready';
+
   return (
     <div className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 w-[600px] max-w-[90vw] z-40 ${state.darkMode ? 'bg-gray-900' : 'bg-white'} rounded-2xl shadow-2xl border-2 ${state.darkMode ? 'border-gray-700' : 'border-gray-200'} flex flex-col`}>
       {/* Header */}
-      <div className="bg-gradient-to-r from-green-400 to-emerald-500 rounded-t-2xl p-4">
+      <div className={`rounded-t-2xl p-4 ${
+        canType 
+          ? 'bg-gradient-to-r from-green-400 to-emerald-500' 
+          : 'bg-gradient-to-r from-red-400 to-red-500'
+      }`}>
         <h2 className="text-xl font-bold text-white text-center">
           ESPAÇO PARA O LOGUES ESCREVER
         </h2>
         <p className="text-white/90 text-sm text-center mt-1">
-          ENTER para enviar • SHIFT+ENTER para quebrar linha
+          {canType ? 'ENTER para enviar • SHIFT+ENTER para quebrar linha' : selectionStatus.message}
         </p>
       </div>
 
       {/* Área de digitação */}
       <div className="flex-1 p-4 flex flex-col">
+        {/* Alerta de seleções obrigatórias */}
+        {!canType && (
+          <div className="mb-4 flex items-center space-x-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+            <div>
+              <p className="text-red-500 font-medium text-sm">Seleções obrigatórias pendentes</p>
+              <p className="text-red-400 text-xs">
+                Selecione {!state.selectedLocation && !state.selectedAction ? 'LOCAL e AÇÃO' : 
+                          !state.selectedLocation ? 'LOCAL' : 'AÇÃO'} para começar a digitar
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="relative">
           <textarea
             ref={textareaRef}
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={handleNotesChange}
             onKeyDown={handleKeyDown}
+            onFocus={handleTextareaFocus}
+            onClick={handleTextareaClick}
             className={`w-full h-32 p-4 rounded-xl border-2 transition-all duration-200 resize-none text-lg ${
-              state.darkMode 
+              !canType
+                ? 'bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed'
+                : state.darkMode 
                 ? 'bg-gray-800 border-gray-600 text-white focus:border-cyan-500'
                 : 'bg-gray-50 border-gray-300 text-gray-900 focus:border-cyan-500'
             } focus:ring-2 focus:ring-cyan-500/20`}
-            placeholder="Digite aqui o que está acontecendo... (ENTER para enviar, SHIFT+ENTER para quebrar linha)"
-            disabled={loading}
+            placeholder={canType ? "Digite aqui o que está acontecendo... (ENTER para enviar, SHIFT+ENTER para quebrar linha)" : "Selecione LOCAL e AÇÃO primeiro..."}
+            disabled={loading || !canType}
+            readOnly={!canType}
           />
 
           {/* Botão de voz */}
           <button
             onClick={handleVoiceRecording}
+            disabled={!canType}
             className={`absolute top-4 right-4 p-3 rounded-xl transition-all duration-200 ${
-              isListening
+              !canType
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : isListening
                 ? 'bg-red-500 text-white animate-pulse'
                 : state.darkMode 
                 ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
             }`}
-            title="Gravação de voz"
+            title={canType ? "Gravação de voz" : "Selecione LOCAL e AÇÃO primeiro"}
           >
             {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </button>
@@ -171,15 +253,14 @@ const NotesPanel: React.FC = () => {
           
           <button
             onClick={handleSubmit}
-            disabled={loading || !notes.trim()}
-            className={`flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-bold hover:from-cyan-600 hover:to-blue-700 focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+            disabled={loading || !notes.trim() || !canType}
+            className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-bold transition-all duration-200 ${
+              !canType || !notes.trim()
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700 focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2'
+            } disabled:opacity-50 disabled:cursor-not-allowed ${
               loading ? 'cursor-wait' : ''
             }`}
-            onClick={(e) => {
-              console.log('🖱️ Botão de envio clicado');
-              e.preventDefault();
-              handleSubmit();
-            }}
           >
             {loading ? (
               <>
@@ -195,18 +276,42 @@ const NotesPanel: React.FC = () => {
           </button>
         </div>
 
-        {/* Instruções */}
+        {/* Status das seleções */}
         <div className={`mt-3 p-3 rounded-lg ${state.darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
-          <p className={`text-xs text-center ${state.darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-            ⚠️ Selecione um LOCAL e uma AÇÃO antes de enviar
-          </p>
-          
-          {/* Debug info */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className={`mt-1 text-xs text-center ${state.darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              Debug: Local={state.selectedLocation ? '✓' : '✗'} | Ação={state.selectedAction ? '✓' : '✗'}
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="text-center">
+              <div className={`font-bold ${state.selectedLocation ? 'text-green-500' : 'text-red-500'}`}>
+                LOCAL {state.selectedLocation ? '✓' : '✗'}
+              </div>
+              <div className={`text-xs ${state.darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                {state.selectedLocation ? 
+                  state.locations.find(l => l.id === state.selectedLocation)?.name || 'Selecionado' : 
+                  'Não selecionado'
+                }
+              </div>
             </div>
-          )}
+            
+            <div className="text-center">
+              <div className={`font-bold ${state.selectedAction ? 'text-green-500' : 'text-red-500'}`}>
+                AÇÃO {state.selectedAction ? '✓' : '✗'}
+              </div>
+              <div className={`text-xs ${state.darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                {state.selectedAction ? 
+                  state.actionCategories.find(a => a.id === state.selectedAction)?.name || 'Selecionado' : 
+                  'Não selecionado'
+                }
+              </div>
+            </div>
+            
+            <div className="text-center">
+              <div className={`font-bold ${state.selectedParticipants.length > 0 ? 'text-blue-500' : 'text-gray-500'}`}>
+                PARTICIPANTES ({state.selectedParticipants.length})
+              </div>
+              <div className={`text-xs ${state.darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                {state.selectedParticipants.length > 0 ? 'Selecionados' : 'Opcional'}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
