@@ -98,7 +98,7 @@ const Header: React.FC = () => {
                 </div>
                 <div>
                   <h1 className={`text-2xl font-bold ${state.darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    Reality Show Logger
+                    LOGGER PRO - REALITYSHOW
                   </h1>
                   <p className={`text-sm ${state.darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                     Sistema de Logging Profissional
