@@ -147,7 +147,7 @@ const NotesPanel: React.FC = () => {
           ESPAÇO PARA O LOGUES ESCREVER
         </h2>
         <p className="text-white/90 text-sm text-center mt-1">
-          ENTER para enviar • SHIFT+ENTER para quebrar linha
+          ENTER para enviar e SHIFT+ENTER para quebrar linha
         </p>
       </div>
 
@@ -175,7 +175,7 @@ Pressione ENTER para enviar rapidamente ou SHIFT+ENTER para quebrar linha."
             <div className="absolute top-4 left-4 flex items-center">
               <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse mr-2"></div>
               <span className={`text-sm ${state.darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                Gravando...
+                IA Capturando sua fala...
               </span>
             </div>
           )}
