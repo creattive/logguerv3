@@ -127,7 +127,7 @@ const ActivityFeed: React.FC = () => {
   const canEdit = isAdmin || state.currentUser?.role === 'logger';
 
   return (
-    <div className={`${state.darkMode ? 'bg-gray-900/50' : 'bg-white'} rounded-xl shadow-lg border ${state.darkMode ? 'border-gray-700' : 'border-gray-200'} h-full flex flex-col`}>
+    <div className={`${state.darkMode ? 'bg-gray-900/50' : 'bg-white'} rounded-xl shadow-lg border ${state.darkMode ? 'border-gray-700' : 'border-gray-200'} h-full flex flex-col mb-48`}>
       {/* Header */}
       <div className="p-6 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
@@ -183,7 +183,7 @@ const ActivityFeed: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-6">
         <div className="space-y-4">
           {filteredEntries.length === 0 ? (
-            <div className={`text-center py-12 ${state.darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            <div className={`text-center py-8 ${state.darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
               <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p className="text-lg font-medium mb-2">Nenhuma entrada encontrada</p>
               <p className="text-sm">Comece a registrar atividades para vê-las aqui</p>

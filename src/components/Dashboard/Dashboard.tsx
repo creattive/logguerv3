@@ -46,16 +46,14 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* Terceira linha */}
-          {/* Coluna 1-6: Área de digitação */}
-          <div className="col-span-6">
-            <NotesPanel />
-          </div>
-
-          {/* Coluna 7-12: Feed de atividades */}
-          <div className="col-span-6">
+          {/* Coluna 1-12: Feed de atividades (agora ocupa toda a largura) */}
+          <div className="col-span-12">
             <ActivityFeed />
           </div>
         </div>
+
+        {/* Painel de Notes Flutuante */}
+        <NotesPanel />
       </main>
     </div>
   );
