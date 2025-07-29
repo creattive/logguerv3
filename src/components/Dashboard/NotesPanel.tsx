@@ -230,7 +230,7 @@ const NotesPanel: React.FC = () => {
           : 'bg-gradient-to-r from-red-400 to-red-500'
       }`}>
         <h2 className="text-xl font-bold text-white text-center">
-          ESPAÇO PARA O LOGUES ESCREVER
+          COMEÇE A DIGITAR AQUI OU USE O MIC IA GERAR O QUE VOCÊ FALA.
         </h2>
         <p className="text-white/90 text-sm text-center mt-1">
           {canType ? 'ENTER para enviar • SHIFT+ENTER para quebrar linha' : selectionStatus.message}
@@ -268,7 +268,7 @@ const NotesPanel: React.FC = () => {
                 ? 'bg-gray-800 border-gray-600 text-white focus:border-cyan-500'
                 : 'bg-gray-50 border-gray-300 text-gray-900 focus:border-cyan-500'
             } focus:ring-2 focus:ring-cyan-500/20`}
-            placeholder={canType ? "Digite aqui o que está acontecendo... (ENTER para enviar, SHIFT+ENTER para quebrar linha)" : "Selecione LOCAL e AÇÃO primeiro..."}
+            placeholder={canType ? "Digite aqui o que está acontecendo ou Clicando no Mic, você fala e a IA transcreve em tempo real)" : "Selecione LOCAL e AÇÃO primeiro..."}
             disabled={loading || !canType}
             readOnly={!canType}
           />
