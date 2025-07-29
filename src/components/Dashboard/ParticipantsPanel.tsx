@@ -11,19 +11,13 @@ const ParticipantsPanel: React.FC = () => {
   }, [state.selectedParticipants]);
 
   const toggleParticipant = (participantId: string) => {
-    setSelectedParticipants(prev => 
-      prev.includes(participantId) 
-        ? prev.filter(id => id !== participantId)
-        : [...prev, participantId]
-    );
+    const newSelection = selectedParticipants.includes(participantId) 
+      ? selectedParticipants.filter(id => id !== participantId)
+      : [...selectedParticipants, participantId];
     
-    // Atualizar no contexto global
-    dispatch({ 
-      type: 'SET_SELECTED_PARTICIPANTS', 
-      payload: selectedParticipants.includes(participantId) 
-        ? selectedParticipants.filter(id => id !== participantId)
-        : [...selectedParticipants, participantId]
-    });
+    console.log('👥 Atualizando seleção de participantes:', newSelection);
+    setSelectedParticipants(newSelection);
+    dispatch({ type: 'SET_SELECTED_PARTICIPANTS', payload: newSelection });
   };
 
   // Participantes com avatars padrão

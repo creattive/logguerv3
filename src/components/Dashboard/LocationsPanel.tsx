@@ -6,6 +6,7 @@ const LocationsPanel: React.FC = () => {
   const [selectedLocation, setSelectedLocation] = React.useState<string>('');
 
   const selectLocation = (locationId: string) => {
+    console.log('📍 Selecionando local:', locationId);
     setSelectedLocation(locationId);
     dispatch({ type: 'SET_SELECTED_LOCATION', payload: locationId });
   };

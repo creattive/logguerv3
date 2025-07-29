@@ -6,6 +6,7 @@ const ActionsPanel: React.FC = () => {
   const [selectedAction, setSelectedAction] = React.useState<string>('');
 
   const selectAction = (actionId: string) => {
+    console.log('🎬 Selecionando ação:', actionId);
     setSelectedAction(actionId);
     dispatch({ type: 'SET_SELECTED_ACTION', payload: actionId });
   };

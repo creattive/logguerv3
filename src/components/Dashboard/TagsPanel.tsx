@@ -10,6 +10,7 @@ const TagsPanel: React.FC = () => {
       ? selectedTags.filter(id => id !== tagId)
       : [...selectedTags, tagId];
     
+    console.log('🏷️ Atualizando seleção de tags:', newSelectedTags);
     setSelectedTags(newSelectedTags);
     dispatch({ type: 'SET_SELECTED_TAGS', payload: newSelectedTags });
   };

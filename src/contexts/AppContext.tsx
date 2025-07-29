@@ -181,7 +181,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [state.isManualTimecode, state.manualTimecodeStart, state.manualTimecodeBase]);
 
   const addLogEntry = async (entry: Omit<LogEntry, 'id' | 'createdAt' | 'createdBy'>) => {
-    await firebaseAddLogEntry(entry);
+    try {
+      console.log('🔄 AppContext: Enviando entrada para Firebase:', entry);
+      const result = await firebaseAddLogEntry(entry);
+      console.log('✅ AppContext: Entrada enviada com sucesso:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ AppContext: Erro ao enviar entrada:', error);
+      throw error;
+    }
   };
 
   const updateLogEntry = async (entryId: string, updates: Partial<LogEntry>) => {

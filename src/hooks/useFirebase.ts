@@ -120,17 +120,25 @@ export const useFirebase = () => {
   const addLogEntry = async (entry: Omit<LogEntry, 'id' | 'createdAt' | 'createdBy'>) => {
     if (!currentUser) throw new Error('User not authenticated');
 
+    console.log('🔄 useFirebase: Adicionando entrada ao Firestore:', entry);
+    console.log('👤 Usuário atual:', currentUser.uid);
+
     const logRef = collection(db, 'logEntries');
     
-    const docRef = await addDoc(logRef, {
-      ...entry,
-      createdBy: currentUser.uid,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
+    try {
+      const docRef = await addDoc(logRef, {
+        ...entry,
+        createdBy: currentUser.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
 
-    console.log('✅ Nova entrada criada com ID:', docRef.id);
-    return docRef.id;
+      console.log('✅ Nova entrada criada com ID:', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('❌ Erro ao adicionar entrada no Firestore:', error);
+      throw error;
+    }
   };
 
   const updateLogEntry = async (entryId: string, updates: Partial<LogEntry>) => {

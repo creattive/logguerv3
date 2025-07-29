@@ -48,11 +48,21 @@ const NotesPanel: React.FC = () => {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      console.log('🎯 Enter pressionado, chamando handleSubmit');
       handleSubmit();
     }
   };
 
   const handleSubmit = async () => {
+    console.log('🚀 handleSubmit chamado');
+    console.log('📝 Notas atuais:', notes);
+    console.log('🔍 Estado atual:', {
+      selectedLocation: state.selectedLocation,
+      selectedAction: state.selectedAction,
+      selectedParticipants: state.selectedParticipants,
+      selectedTags: state.selectedTags
+    });
+
     if (!notes.trim()) return;
 
     console.log('🔄 Tentando enviar log:', {
@@ -78,6 +88,7 @@ const NotesPanel: React.FC = () => {
     setLoading(true);
 
     try {
+      console.log('📝 Criando entrada de log...');
       await addLogEntry({
         timestamp: new Date().toISOString(),
         timecode: state.currentTimecode,
@@ -85,8 +96,7 @@ const NotesPanel: React.FC = () => {
         location: state.selectedLocation,
         actionCategory: state.selectedAction,
         tags: state.selectedTags || [],
-        notes: notes.trim(),
-        updatedAt: new Date().toISOString()
+        notes: notes.trim()
       });
 
       console.log('✅ Log enviado com sucesso!');
@@ -102,7 +112,7 @@ const NotesPanel: React.FC = () => {
       }
     } catch (error) {
       console.error('❌ Erro ao adicionar log:', error);
-      error('Erro ao salvar', 'Não foi possível salvar a entrada. Tente novamente.');
+      error('Erro ao salvar', `Não foi possível salvar a entrada: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setLoading(false);
     }
@@ -162,7 +172,14 @@ const NotesPanel: React.FC = () => {
           <button
             onClick={handleSubmit}
             disabled={loading || !notes.trim()}
-            className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-bold hover:from-cyan-600 hover:to-blue-700 focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-bold hover:from-cyan-600 hover:to-blue-700 focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+              loading ? 'cursor-wait' : ''
+            }`}
+            onClick={(e) => {
+              console.log('🖱️ Botão de envio clicado');
+              e.preventDefault();
+              handleSubmit();
+            }}
           >
             {loading ? (
               <>
