@@ -278,7 +278,7 @@ const NotesPanel: React.FC = () => {
             <div className="absolute top-4 left-4 flex items-center">
               <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse mr-2"></div>
               <span className={`text-sm ${state.darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                Gravando...
+                Estou capturando sua voz...
               </span>
             </div>
           )}
