@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, Mic, MicOff, AlertCircle } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useToast } from '../../hooks/useToast';
@@ -10,7 +10,18 @@ const NotesPanel: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  // Limpar o reconhecimento quando o componente desmontar
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
 
   // Verificar se as seleções obrigatórias foram feitas
   const hasRequiredSelections = () => {
@@ -32,33 +43,68 @@ const NotesPanel: React.FC = () => {
 
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      const recognition = new SpeechRecognition();
       
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      if (isListening) {
+        recognitionRef.current.stop();
+        setIsListening(false);
+        setInterimTranscript('');
+        return;
+      }
+
+      // Configurar o reconhecimento de fala
+      recognitionRef.current = new SpeechRecognition();
+      const recognition = recognitionRef.current;
+      
+      recognition.continuous = true;
+      recognition.interimResults = true;
       recognition.lang = 'pt-BR';
 
-      if (isListening) {
-        recognition.stop();
-        setIsListening(false);
-      } else {
-        recognition.start();
+      recognition.onstart = () => {
         setIsListening(true);
+        setInterimTranscript('');
+      };
 
-        recognition.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setNotes(prev => prev + (prev ? ' ' : '') + transcript);
-          setIsListening(false);
-        };
+      recognition.onresult = (event: any) => {
+        let interim = '';
+        let final = '';
 
-        recognition.onerror = () => {
-          setIsListening(false);
-        };
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            final += transcript;
+          } else {
+            interim += transcript;
+          }
+        }
 
-        recognition.onend = () => {
-          setIsListening(false);
-        };
-      }
+        // Atualizar o texto final quando houver resultados finais
+        if (final) {
+          setNotes(prev => prev + (prev ? ' ' : '') + final);
+          setInterimTranscript('');
+        } else {
+          // Mostrar resultados intermediários
+          setInterimTranscript(interim);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Erro no reconhecimento:', event.error);
+        setIsListening(false);
+        setInterimTranscript('');
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        // Se houver texto intermediário quando terminar, adicionar ao final
+        if (interimTranscript) {
+          setNotes(prev => prev + (prev ? ' ' : '') + interimTranscript);
+          setInterimTranscript('');
+        }
+      };
+
+      recognition.start();
+    } else {
+      error('Navegador não suportado', 'Seu navegador não suporta reconhecimento de voz. Tente o Chrome ou Edge.');
     }
   };
 
@@ -142,6 +188,7 @@ const NotesPanel: React.FC = () => {
 
       // Limpar apenas as notas, manter seleções
       setNotes('');
+      setInterimTranscript('');
       
       success('Log adicionado', 'Entrada registrada com sucesso!');
       
@@ -209,7 +256,7 @@ const NotesPanel: React.FC = () => {
         <div className="relative">
           <textarea
             ref={textareaRef}
-            value={notes}
+            value={notes + (interimTranscript ? ' ' + interimTranscript : '')}
             onChange={handleNotesChange}
             onKeyDown={handleKeyDown}
             onFocus={handleTextareaFocus}
@@ -226,6 +273,16 @@ const NotesPanel: React.FC = () => {
             readOnly={!canType}
           />
 
+          {/* Indicador de gravação */}
+          {isListening && (
+            <div className="absolute top-4 left-4 flex items-center">
+              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse mr-2"></div>
+              <span className={`text-sm ${state.darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                Gravando...
+              </span>
+            </div>
+          )}
+
           {/* Botão de voz */}
           <button
             onClick={handleVoiceRecording}
@@ -234,7 +291,7 @@ const NotesPanel: React.FC = () => {
               !canType
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : isListening
-                ? 'bg-red-500 text-white animate-pulse'
+                ? 'bg-red-500 text-white'
                 : state.darkMode 
                 ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
@@ -248,7 +305,10 @@ const NotesPanel: React.FC = () => {
         {/* Botão de envio */}
         <div className="mt-4 flex items-center justify-between">
           <div className={`text-sm ${state.darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-            {notes.length} caracteres
+            {notes.length + interimTranscript.length} caracteres
+            {isListening && (
+              <span className="ml-2 text-cyan-500">● Gravando</span>
+            )}
           </div>
           
           <button
