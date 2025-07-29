@@ -230,7 +230,7 @@ const NotesPanel: React.FC = () => {
           : 'bg-gradient-to-r from-red-400 to-red-500'
       }`}>
         <h2 className="text-xl font-bold text-white text-center">
-          COMEÇE A DIGITAR OU USE O MIC IA GERAR O QUE VOCÊ FALA.
+          Comece a digitar ou use o "Mic" para a IA gerar o que você fala.
         </h2>
         <p className="text-white/90 text-sm text-center mt-1">
           {canType ? 'ENTER para enviar • SHIFT+ENTER para quebrar linha' : selectionStatus.message}
