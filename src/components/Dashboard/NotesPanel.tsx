@@ -1,47 +1,91 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, Mic, MicOff } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
-import { useToast } from '../../hooks/useToast';
 import { v4 as uuidv4 } from 'uuid';
 
 const NotesPanel: React.FC = () => {
-  const { state, addLogEntry, dispatch } = useApp();
-  const { success, error, warning } = useToast();
+  const { state, addLogEntry } = useApp();
   const [notes, setNotes] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    // Limpar o reconhecimento quando o componente desmontar
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
 
   const handleVoiceRecording = () => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      const recognition = new SpeechRecognition();
       
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      if (isListening) {
+        recognitionRef.current.stop();
+        setIsListening(false);
+        setInterimTranscript('');
+        return;
+      }
+
+      // Configurar o reconhecimento de fala
+      recognitionRef.current = new SpeechRecognition();
+      const recognition = recognitionRef.current;
+      
+      recognition.continuous = true;
+      recognition.interimResults = true;
       recognition.lang = 'pt-BR';
 
-      if (isListening) {
-        recognition.stop();
-        setIsListening(false);
-      } else {
-        recognition.start();
+      recognition.onstart = () => {
         setIsListening(true);
+        setInterimTranscript('');
+      };
 
-        recognition.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setNotes(prev => prev + (prev ? ' ' : '') + transcript);
-          setIsListening(false);
-        };
+      recognition.onresult = (event: any) => {
+        let interim = '';
+        let final = '';
 
-        recognition.onerror = () => {
-          setIsListening(false);
-        };
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            final += transcript;
+          } else {
+            interim += transcript;
+          }
+        }
 
-        recognition.onend = () => {
-          setIsListening(false);
-        };
-      }
+        // Atualizar o texto final quando houver resultados finais
+        if (final) {
+          setNotes(prev => prev + (prev ? ' ' : '') + final);
+          setInterimTranscript('');
+        } else {
+          // Mostrar resultados intermediários
+          setInterimTranscript(interim);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Erro no reconhecimento:', event.error);
+        setIsListening(false);
+        setInterimTranscript('');
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        // Se houver texto intermediário quando terminar, adicionar ao final
+        if (interimTranscript) {
+          setNotes(prev => prev + (prev ? ' ' : '') + interimTranscript);
+          setInterimTranscript('');
+        }
+      };
+
+      recognition.start();
+    } else {
+      alert('Seu navegador não suporta reconhecimento de voz. Tente o Chrome ou Edge.');
     }
   };
 
@@ -55,23 +99,12 @@ const NotesPanel: React.FC = () => {
   const handleSubmit = async () => {
     if (!notes.trim()) return;
 
-    console.log('🔄 Tentando enviar log:', {
-      notes: notes.trim(),
-      selectedLocation: state.selectedLocation,
-      selectedAction: state.selectedAction,
-      selectedParticipants: state.selectedParticipants
-    });
-
-    // Verificar se tem seleções obrigatórias
-    const hasLocation = state.selectedLocation && state.selectedLocation.trim() !== '';
-    const hasAction = state.selectedAction && state.selectedAction.trim() !== '';
+    // Verificar se tem pelo menos uma seleção obrigatória
+    const hasLocation = state.selectedLocation;
+    const hasAction = state.selectedAction;
     
     if (!hasLocation || !hasAction) {
-      const missing = [];
-      if (!hasLocation) missing.push('Local');
-      if (!hasAction) missing.push('Ação');
-      
-      warning('Seleções obrigatórias', `Selecione: ${missing.join(' e ')} antes de enviar!`);
+      alert('Selecione pelo menos um local e uma ação antes de enviar!');
       return;
     }
 
@@ -79,6 +112,7 @@ const NotesPanel: React.FC = () => {
 
     try {
       await addLogEntry({
+        id: uuidv4(),
         timestamp: new Date().toISOString(),
         timecode: state.currentTimecode,
         participants: state.selectedParticipants || [],
@@ -89,20 +123,17 @@ const NotesPanel: React.FC = () => {
         updatedAt: new Date().toISOString()
       });
 
-      console.log('✅ Log enviado com sucesso!');
-
       // Limpar apenas as notas, manter seleções
       setNotes('');
-      
-      success('Log adicionado', 'Entrada registrada com sucesso!');
+      setInterimTranscript('');
       
       // Focar novamente no textarea
       if (textareaRef.current) {
         textareaRef.current.focus();
       }
     } catch (error) {
-      console.error('❌ Erro ao adicionar log:', error);
-      error('Erro ao salvar', 'Não foi possível salvar a entrada. Tente novamente.');
+      console.error('Error adding log entry:', error);
+      alert('Erro ao salvar entrada. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -125,7 +156,7 @@ const NotesPanel: React.FC = () => {
         <div className="flex-1 relative">
           <textarea
             ref={textareaRef}
-            value={notes}
+            value={notes + (interimTranscript ? ' ' + interimTranscript : '')}
             onChange={(e) => setNotes(e.target.value)}
             onKeyDown={handleKeyDown}
             className={`w-full h-full p-4 rounded-xl border-2 transition-all duration-200 resize-none text-lg ${
@@ -139,17 +170,28 @@ Pressione ENTER para enviar rapidamente ou SHIFT+ENTER para quebrar linha."
             disabled={loading}
           />
 
+          {/* Indicador de gravação */}
+          {isListening && (
+            <div className="absolute top-4 left-4 flex items-center">
+              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse mr-2"></div>
+              <span className={`text-sm ${state.darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                Gravando...
+              </span>
+            </div>
+          )}
+
           {/* Botão de voz */}
           <button
             onClick={handleVoiceRecording}
             className={`absolute top-4 right-4 p-3 rounded-xl transition-all duration-200 ${
               isListening
-                ? 'bg-red-500 text-white animate-pulse'
+                ? 'bg-red-500 text-white'
                 : state.darkMode 
                 ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
             }`}
             title="Gravação de voz"
+            disabled={loading}
           >
             {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </button>
@@ -158,7 +200,10 @@ Pressione ENTER para enviar rapidamente ou SHIFT+ENTER para quebrar linha."
         {/* Botão de envio */}
         <div className="mt-4 flex items-center justify-between">
           <div className={`text-sm ${state.darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-            {notes.length} caracteres
+            {notes.length + interimTranscript.length} caracteres
+            {isListening && (
+              <span className="ml-2 text-cyan-500">● Gravando</span>
+            )}
           </div>
           
           <button
@@ -183,17 +228,9 @@ Pressione ENTER para enviar rapidamente ou SHIFT+ENTER para quebrar linha."
         {/* Instruções */}
         <div className={`mt-3 p-3 rounded-lg ${state.darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
           <p className={`text-sm text-center ${state.darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-            ⚠️ Selecione um LOCAL e uma AÇÃO antes de enviar
-            <br />
-            Após ENTER, o conteúdo é gravado com timecode
+            TODO CONTEÚDO, APÓS APERTAR ENTER ESSE CONTEÚDO É GRAVADO E 
+            MANDADO PARA O ADM COM O TAKE E O TIME CODE DO SISTEMA MARCADO
           </p>
-          
-          {/* Debug info */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className={`mt-2 text-xs ${state.darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              Debug: Local={state.selectedLocation ? '✓' : '✗'} | Ação={state.selectedAction ? '✓' : '✗'}
-            </div>
-          )}
         </div>
       </div>
     </div>
