@@ -88,7 +88,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
           <div className="mt-6 text-center">
             <p className="text-white/80 text-sm">USO AUTORIZADO POR</p>
             <p className="text-white font-bold text-lg tracking-wider">
-              BIG BROTHER BRASIL
+              Indevice Produções
             </p>
           </div>
         </div>
@@ -190,10 +190,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         <div className="mt-8 text-center">
           <div className="bg-cyan-400/20 backdrop-blur-sm rounded-2xl p-4 border border-cyan-400/30">
             <p className="text-cyan-100 text-sm font-medium">
-              NOME DO REALITY QUE<br />
-              CONTRATOU O SISTEMA<br />
-              CONFIGURÁVEL NA<br />
-              ÁREA ADMINISTRATIVA
+              © 2025 INDEVICE PRODUCOES, EVENTOS, COMUNICACAO E ARTISTICO LTDA - ME<br />
+              CNPJ: 48.379.142/0001-38<br />
+              Todos os direitos reservados. O uso não autorizado deste software é proibido e sujeito às penalidades da lei<br />
+              Registro Nº: 000984.0247118/2025
             </p>
           </div>
         </div>
