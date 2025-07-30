@@ -7,7 +7,7 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import AdminPanel from './AdminPanel';
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
 import Analytics from './Analytics';
-import LTC from 'ltc-decoder'; // Biblioteca para decodificar LTC
+
 
 const Header: React.FC = () => {
   const { state, dispatch } = useApp();
