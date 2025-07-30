@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { Moon, Sun, LogOut, User, Clock, Edit3, RotateCcw, Settings } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useFirebase } from '../../hooks/useFirebase';
@@ -7,7 +7,6 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import AdminPanel from './AdminPanel';
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
 import Analytics from './Analytics';
-
 
 const Header: React.FC = () => {
   const { state, dispatch } = useApp();
@@ -18,74 +17,6 @@ const Header: React.FC = () => {
   const [tempTimecode, setTempTimecode] = useState(state.currentTimecode);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const ltcDecoderRef = useRef(null);
-  const signalLostTimeoutRef = useRef(null);
-
-  // Configura o decoder LTC
-  useEffect(() => {
-    const handleTimecodeReceived = (tc) => {
-      // Formata o timecode para HH:MM:SS:FF
-      const formattedTC = `${String(tc.hours).padStart(2, '0')}:${String(tc.minutes).padStart(2, '0')}:${String(tc.seconds).padStart(2, '0')}:${String(tc.frames).padStart(2, '0')}`;
-      
-      dispatch({
-        type: 'SET_EXTERNAL_TIMECODE',
-        payload: {
-          timecode: formattedTC,
-          source: 'external',
-          isActive: true
-        }
-      });
-
-      // Resetar timeout de perda de sinal
-      clearTimeout(signalLostTimeoutRef.current);
-      signalLostTimeoutRef.current = setTimeout(() => {
-        dispatch({
-          type: 'SET_EXTERNAL_TIMECODE',
-          payload: {
-            isActive: false,
-            source: state.timecodeSource === 'external' ? 'system' : state.timecodeSource
-          }
-        });
-        error('Sinal LTC perdido', 'Voltando para timecode ' + (state.timecodeSource === 'external' ? 'do sistema' : 'manual'));
-      }, 2000); // 2 segundos sem sinal = considerar perdido
-    };
-
-    const initLtcDecoder = async () => {
-      try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const decoder = new LTC(audioContext);
-        
-        decoder.on('timecode', handleTimecodeReceived);
-        
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const source = audioContext.createMediaStreamSource(stream);
-        source.connect(decoder.node);
-        
-        ltcDecoderRef.current = {
-          decoder,
-          audioContext,
-          source
-        };
-
-        success('Decoder LTC iniciado', 'Aguardando sinal de timecode...');
-      } catch (err) {
-        console.error('Erro ao iniciar decoder LTC:', err);
-        error('Erro no decoder LTC', 'Verifique as permissões de áudio');
-      }
-    };
-
-    if (state.enableLtc) {
-      initLtcDecoder();
-    }
-
-    return () => {
-      clearTimeout(signalLostTimeoutRef.current);
-      if (ltcDecoderRef.current) {
-        ltcDecoderRef.current.decoder.stop();
-        ltcDecoderRef.current.audioContext.close();
-      }
-    };
-  }, [state.enableLtc, dispatch, error, success, state.timecodeSource]);
 
   const handleLogout = async () => {
     try {
@@ -99,17 +30,18 @@ const Header: React.FC = () => {
 
   const handleTimecodeEdit = () => {
     if (isEditingTimecode) {
+      // Validar formato do timecode (HH:MM:SS:FF)
       const timecodeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5]?[0-9]):([0-5]?[0-9]):([0-2]?[0-9]|3[0-1])$/;
       
       if (timecodeRegex.test(tempTimecode)) {
+        // Salvar o timecode editado e ativar modo manual
         const now = Date.now();
         dispatch({ 
           type: 'SET_MANUAL_TIMECODE', 
           payload: { 
             isManual: true, 
             startTime: now, 
-            baseTimecode: tempTimecode,
-            source: 'manual'
+            baseTimecode: tempTimecode 
           } 
         });
         setIsEditingTimecode(false);
@@ -125,13 +57,13 @@ const Header: React.FC = () => {
   };
 
   const handleSyncTimecode = () => {
+    // Voltar para modo automático (horário do sistema)
     dispatch({ 
       type: 'SET_MANUAL_TIMECODE', 
       payload: { 
         isManual: false, 
         startTime: undefined, 
-        baseTimecode: undefined,
-        source: 'system'
+        baseTimecode: undefined 
       } 
     });
     setIsEditingTimecode(false);
@@ -143,7 +75,8 @@ const Header: React.FC = () => {
     setIsEditingTimecode(false);
   };
 
-  useEffect(() => {
+  // Atualizar tempTimecode quando o timecode do estado mudar (apenas se não estiver editando)
+  React.useEffect(() => {
     if (!isEditingTimecode) {
       setTempTimecode(state.currentTimecode);
     }
@@ -165,7 +98,7 @@ const Header: React.FC = () => {
                 </div>
                 <div>
                   <h1 className={`text-2xl font-bold ${state.darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    LOGGER PRO - REALITYSHOW
+                    Reality Show Logger
                   </h1>
                   <p className={`text-sm ${state.darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                     Sistema de Logging Profissional
@@ -222,18 +155,9 @@ const Header: React.FC = () => {
                     <span className={`font-mono text-2xl font-bold ${state.darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>
                       {state.currentTimecode}
                     </span>
-                    {state.timecodeSource === 'manual' && (
+                    {state.isManualTimecode && (
                       <span className={`text-xs px-2 py-1 rounded-full font-bold ${state.darkMode ? 'bg-yellow-900 text-yellow-300' : 'bg-yellow-100 text-yellow-800'}`}>
                         MANUAL
-                      </span>
-                    )}
-                    {state.timecodeSource === 'external' && (
-                      <span className={`text-xs px-2 py-1 rounded-full font-bold ${
-                        state.ltcSignalActive 
-                          ? state.darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800'
-                          : state.darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {state.ltcSignalActive ? 'LTC' : 'LTC (OFF)'}
                       </span>
                     )}
                   </div>
@@ -267,7 +191,7 @@ const Header: React.FC = () => {
                   <button
                     onClick={handleSyncTimecode}
                     className={`p-2 rounded-lg transition-all duration-200 ${
-                      state.timecodeSource === 'manual' 
+                      state.isManualTimecode 
                         ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
                         : state.darkMode 
                         ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
