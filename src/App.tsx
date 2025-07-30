@@ -9,16 +9,16 @@ import FirebaseDebug from './components/Debug/FirebaseDebug';
 import { doc, setDoc, collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { db } from './config/firebase';
 
-// Initialize sample data only if collections are empty
+// Inicializa dados de amostra somente se as coleções estiverem vazias
 const initializeSampleData = async () => {
   try {
-    // Check if data already exists
+  // Verifique se os dados já existem
     const participantsSnapshot = await getDocs(collection(db, 'participants'));
     const locationsSnapshot = await getDocs(collection(db, 'locations'));
     const actionCategoriesSnapshot = await getDocs(collection(db, 'actionCategories'));
     const tagsSnapshot = await getDocs(collection(db, 'tags'));
 
-    // Only initialize if all collections are empty
+   // Inicializar somente se todas as coleções estiverem vazias
     if (participantsSnapshot.size > 0 || 
         locationsSnapshot.size > 0 || 
         actionCategoriesSnapshot.size > 0 || 
@@ -29,7 +29,7 @@ const initializeSampleData = async () => {
 
     console.log('🔄 Inicializando dados de amostra pela primeira vez...');
 
-    // Sample Participants
+    // Participantes de expemplo
     const participants = [
       { name: 'Alex Johnson', bio: 'Fitness enthusiast and team leader', isActive: true },
       { name: 'Sarah Wilson', bio: 'Artist and creative strategist', isActive: true },
@@ -37,7 +37,7 @@ const initializeSampleData = async () => {
       { name: 'Emma Davis', bio: 'Adventure seeker and motivator', isActive: true }
     ];
 
-    // Sample Locations
+   // Locais de amostra
     const locations = [
       { name: 'Main Living Area', description: 'Central hub for daily activities', color: '#3B82F6' },
       { name: 'Kitchen', description: 'Cooking and meal prep area', color: '#EF4444' },
@@ -45,7 +45,7 @@ const initializeSampleData = async () => {
       { name: 'Confessional', description: 'Private interview space', color: '#8B5CF6' }
     ];
 
-    // Sample Action Categories
+    // Categorias de ação de exemplo
     const actionCategories = [
       { name: 'Challenge', description: 'Competition or task-based activities', color: '#F59E0B' },
       { name: 'Conflict', description: 'Disagreements or tensions', color: '#DC2626' },
@@ -54,7 +54,7 @@ const initializeSampleData = async () => {
       { name: 'Social', description: 'Casual interactions and bonding', color: '#2563EB' }
     ];
 
-    // Sample Tags
+   // Tags de amostra
     const tags = [
       { name: 'Drama', color: '#DC2626' },
       { name: 'Strategy', color: '#059669' },
@@ -63,7 +63,7 @@ const initializeSampleData = async () => {
       { name: 'Important', color: '#DC2626' }
     ];
 
-    // Use addDoc instead of setDoc to let Firestore generate IDs
+    // Use addDoc em vez de setDoc para permitir que o Firestore gere IDs
     for (const participant of participants) {
       await addDoc(collection(db, 'participants'), {
         ...participant,
@@ -134,7 +134,7 @@ const AppContent: React.FC = () => {
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-white text-lg">Carregando LOGGUER PRO...</p>
+          <p className="text-white text-lg">Carregando SISLOGUER...</p>
         </div>
       </div>
     );
