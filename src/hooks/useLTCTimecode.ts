@@ -1,160 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { RealLTCDecoder, LTCFrame } from '../utils/ltcDecoder';
 
 interface LTCTimecodeHook {
   isLTCAvailable: boolean;
   isLTCActive: boolean;
   ltcTimecode: string | null;
   ltcSignalStrength: number;
+  ltcFrame: LTCFrame | null;
+  frameRate: number;
+  dropFrame: boolean;
   startLTCDetection: () => Promise<void>;
   stopLTCDetection: () => Promise<void>;
+  setFrameRate: (rate: number) => void;
+  setThreshold: (threshold: number) => void;
   error: string | null;
 }
 
-class LTCDecoder {
-  private audioContext: AudioContext | null = null;
-  private analyser: AnalyserNode | null = null;
-  private microphone: MediaStreamAudioSourceNode | null = null;
-  private isRunning = false;
-  private onTimecodeCallback: ((timecode: string, strength: number) => void) | null = null;
-  private lastValidTimecode: string | null = null;
-  private signalStrength = 0;
-  private stream: MediaStream | null = null;
-  private animationFrameId: number | null = null;
-
-  async initialize(): Promise<void> {
-    try {
-      this.stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          sampleRate: 48000,
-          channelCount: 1,
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false
-        } 
-      });
-
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
-      
-      this.analyser = this.audioContext.createAnalyser();
-      this.microphone = this.audioContext.createMediaStreamSource(this.stream);
-
-      this.analyser.fftSize = 2048;
-      this.analyser.smoothingTimeConstant = 0.1;
-      this.microphone.connect(this.analyser);
-
-      console.log('🎵 LTC Decoder initialized successfully');
-    } catch (error) {
-      console.error('❌ Error initializing LTC Decoder:', error);
-      throw error;
-    }
-  }
-
-  start(onTimecode: (timecode: string, strength: number) => void): void {
-    if (!this.analyser || this.isRunning) return;
-
-    this.onTimecodeCallback = onTimecode;
-    this.isRunning = true;
-    this.processAudio();
-  }
-
-  async stop(): Promise<void> {
-    this.isRunning = false;
-    this.onTimecodeCallback = null;
-    
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
-    }
-    
-    if (this.stream) {
-      this.stream.getTracks().forEach(track => track.stop());
-      this.stream = null;
-    }
-    
-    if (this.microphone) {
-      this.microphone.disconnect();
-      this.microphone = null;
-    }
-    
-    if (this.audioContext && this.audioContext.state !== 'closed') {
-      try {
-        await this.audioContext.close();
-      } catch (error) {
-        console.warn('Error closing audio context:', error);
-      }
-      this.audioContext = null;
-    }
-    
-    this.analyser = null;
-    this.signalStrength = 0;
-    this.lastValidTimecode = null;
-  }
-
-  private processAudio(): void {
-    if (!this.isRunning || !this.analyser) return;
-
-    const bufferLength = this.analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    
-    try {
-      this.analyser.getByteFrequencyData(dataArray);
-    } catch (error) {
-      console.error('Error getting frequency data:', error);
-      return;
-    }
-
-    const ltcDetected = this.detectLTCSignal(dataArray);
-    
-    if (ltcDetected.detected) {
-      this.signalStrength = ltcDetected.strength;
-      const timecode = this.decodeLTCTimecode(dataArray);
-      
-      if (timecode && this.onTimecodeCallback) {
-        this.lastValidTimecode = timecode;
-        this.onTimecodeCallback(timecode, this.signalStrength);
-      }
-    } else {
-      this.signalStrength = Math.max(0, this.signalStrength - 2);
-    }
-
-    this.animationFrameId = requestAnimationFrame(() => this.processAudio());
-  }
-
-  private detectLTCSignal(dataArray: Uint8Array): { detected: boolean; strength: number } {
-    let totalEnergy = 0;
-    let ltcBandEnergy = 0;
-    
-    for (let i = 0; i < dataArray.length; i++) {
-      totalEnergy += dataArray[i];
-      if (i >= 50 && i <= 150) {
-        ltcBandEnergy += dataArray[i];
-      }
-    }
-
-    const averageEnergy = totalEnergy / dataArray.length;
-    const ltcRatio = totalEnergy > 0 ? ltcBandEnergy / totalEnergy : 0;
-    
-    const detected = averageEnergy > 20 && ltcRatio > 0.08;
-    const strength = Math.min(100, (averageEnergy / 128) * 100);
-
-    return { detected, strength };
-  }
-
-  private decodeLTCTimecode(dataArray: Uint8Array): string | null {
-    // Simulated LTC decoding - replace with real decoding logic
-    const now = new Date();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    const seconds = now.getSeconds();
-    const frames = Math.floor(now.getMilliseconds() / 33.33);
-
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}:${String(frames).padStart(2, '0')}`;
-  }
-}
 
 export const useLTCTimecode = (): LTCTimecodeHook => {
   const [state, setState] = useState({
@@ -162,20 +23,29 @@ export const useLTCTimecode = (): LTCTimecodeHook => {
     isLTCActive: false,
     ltcTimecode: null as string | null,
     ltcSignalStrength: 0,
+    ltcFrame: null as LTCFrame | null,
+    frameRate: 30,
+    dropFrame: false,
     error: null as string | null
   });
 
-  const decoderRef = useRef<LTCDecoder | null>(null);
+  const decoderRef = useRef<RealLTCDecoder | null>(null);
   const lastUpdateRef = useRef<number>(0);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initializingRef = useRef(false);
 
-  const handleTimecodeUpdate = useCallback((timecode: string, strength: number) => {
+  const handleTimecodeUpdate = useCallback((timecode: string, frame: LTCFrame, strength: number) => {
+    console.log('🎵 LTC Timecode received:', { timecode, frame, strength });
+    
     setState(prev => ({
       ...prev,
       ltcTimecode: timecode,
       ltcSignalStrength: strength,
-      isLTCActive: true
+      ltcFrame: frame,
+      frameRate: frame.frameRate,
+      dropFrame: frame.dropFrame,
+      isLTCActive: true,
+      error: null
     }));
     
     lastUpdateRef.current = Date.now();
@@ -189,9 +59,19 @@ export const useLTCTimecode = (): LTCTimecodeHook => {
         ...prev,
         isLTCActive: false,
         ltcTimecode: null,
+        ltcFrame: null,
         ltcSignalStrength: 0
       }));
-    }, 2000);
+    }, 3000); // Timeout aumentado para 3 segundos
+  }, []);
+
+  const handleLTCError = useCallback((error: string) => {
+    console.error('🎵 LTC Error:', error);
+    setState(prev => ({
+      ...prev,
+      error,
+      isLTCActive: false
+    }));
   }, []);
 
   const startLTCDetection = useCallback(async (): Promise<void> => {
@@ -202,21 +82,33 @@ export const useLTCTimecode = (): LTCTimecodeHook => {
       setState(prev => ({ ...prev, error: null }));
 
       if (!decoderRef.current) {
-        decoderRef.current = new LTCDecoder();
+        decoderRef.current = new RealLTCDecoder({
+          sampleRate: 48000,
+          frameRate: 30,
+          dropFrame: false,
+          threshold: 0.3,
+          filterFreq: 2400
+        });
+        
+        console.log('🎵 Created new Real LTC Decoder');
       }
 
       await decoderRef.current.initialize();
-      decoderRef.current.start(handleTimecodeUpdate);
+      decoderRef.current.start(handleTimecodeUpdate, handleLTCError);
       
       setState(prev => ({
         ...prev,
         isLTCAvailable: true,
-        isLTCActive: true
+        isLTCActive: true,
+        error: null
       }));
+      
+      console.log('🎵 Real LTC Detection started successfully');
     } catch (err: any) {
+      console.error('🎵 Failed to start LTC detection:', err);
       setState(prev => ({
         ...prev,
-        error: err.message || 'Failed to start LTC detection',
+        error: err.message || 'Falha ao iniciar detecção LTC',
         isLTCAvailable: false,
         isLTCActive: false
       }));
@@ -232,9 +124,11 @@ export const useLTCTimecode = (): LTCTimecodeHook => {
     } finally {
       initializingRef.current = false;
     }
-  }, [handleTimecodeUpdate]);
+  }, [handleTimecodeUpdate, handleLTCError]);
 
   const stopLTCDetection = useCallback(async (): Promise<void> => {
+    console.log('🎵 Stopping LTC detection...');
+    
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
@@ -253,8 +147,26 @@ export const useLTCTimecode = (): LTCTimecodeHook => {
       ...prev,
       isLTCActive: false,
       ltcTimecode: null,
+      ltcFrame: null,
       ltcSignalStrength: 0
     }));
+    
+    console.log('🎵 LTC detection stopped');
+  }, []);
+
+  const setFrameRate = useCallback((rate: number) => {
+    if (decoderRef.current) {
+      decoderRef.current.setFrameRate(rate);
+      setState(prev => ({ ...prev, frameRate: rate }));
+      console.log('🎵 LTC Frame rate set to:', rate);
+    }
+  }, []);
+
+  const setThreshold = useCallback((threshold: number) => {
+    if (decoderRef.current) {
+      decoderRef.current.setThreshold(threshold);
+      console.log('🎵 LTC Threshold set to:', threshold);
+    }
   }, []);
 
   useEffect(() => {
@@ -266,9 +178,9 @@ export const useLTCTimecode = (): LTCTimecodeHook => {
       if (!hasWebAudio || !hasMediaDevices || !isSecureContext) {
         setState(prev => ({
           ...prev,
-          error: !hasWebAudio ? 'Web Audio API not supported' :
-                !hasMediaDevices ? 'Microphone access not supported' :
-                'LTC requires HTTPS or localhost'
+          error: !hasWebAudio ? 'Web Audio API não suportado' :
+                !hasMediaDevices ? 'Acesso ao microfone não suportado' :
+                'LTC requer HTTPS ou localhost'
         }));
       }
     };
@@ -283,6 +195,8 @@ export const useLTCTimecode = (): LTCTimecodeHook => {
   return {
     ...state,
     startLTCDetection,
-    stopLTCDetection
+    stopLTCDetection,
+    setFrameRate,
+    setThreshold
   };
 };

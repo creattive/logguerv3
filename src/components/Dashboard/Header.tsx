@@ -8,6 +8,7 @@ import { useLTCTimecode } from '../../hooks/useLTCTimecode';
 import AdminPanel from './AdminPanel';
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
 import Analytics from './Analytics';
+import LTCMonitor from './LTCMonitor';
 
 const Header: React.FC = () => {
   const { state, dispatch } = useApp();
@@ -27,6 +28,7 @@ const Header: React.FC = () => {
   const [tempTimecode, setTempTimecode] = useState(state.currentTimecode);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showLTCMonitor, setShowLTCMonitor] = useState(false);
 
   // Atualizar timecode externo quando recebido
   React.useEffect(() => {
@@ -264,6 +266,23 @@ const Header: React.FC = () => {
                     {isLTCActive ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
                   </button>
                   
+                  {/* Botão Monitor LTC */}
+                  {isLTCActive && (
+                    <button
+                      onClick={() => setShowLTCMonitor(!showLTCMonitor)}
+                      className={`p-2 rounded-lg transition-all duration-200 ${
+                        showLTCMonitor
+                          ? 'bg-cyan-500 text-white'
+                          : state.darkMode 
+                          ? 'bg-gray-700 text-cyan-400 hover:bg-gray-600' 
+                          : 'bg-gray-200 text-cyan-600 hover:bg-gray-300'
+                      }`}
+                      title="Monitor LTC em Tempo Real"
+                    >
+                      📊
+                    </button>
+                  )}
+                  
                   <button
                     onClick={handleTimecodeEdit}
                     disabled={state.timecodeMode === 'external'}
@@ -430,6 +449,12 @@ const Header: React.FC = () => {
       {showAnalytics && (
         <Analytics onClose={() => setShowAnalytics(false)} />
       )}
+
+      {/* LTC Monitor */}
+      <LTCMonitor 
+        isVisible={showLTCMonitor} 
+        onClose={() => setShowLTCMonitor(false)} 
+      />
     </>
   );
 };
