@@ -68,6 +68,11 @@ export interface AppState {
   isManualTimecode: boolean;
   manualTimecodeStart: number | null; // timestamp quando o modo manual foi ativado
   manualTimecodeBase: string | null; // timecode base definido pelo usuário
+  isExternalTimecode: boolean;
+  externalTimecodeSource: 'ltc' | null;
+  lastExternalTimecode: string | null;
+  timecodeMode: 'auto' | 'manual' | 'external';
+  previousTimecodeMode: 'auto' | 'manual' | null; // para fallback quando perder sinal externo
   selectedParticipants: string[];
   selectedLocation: string;
   selectedAction: string;

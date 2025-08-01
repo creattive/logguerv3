@@ -20,6 +20,9 @@ type AppAction =
   | { type: 'SET_RECORDING'; payload: boolean }
   | { type: 'SET_TIMECODE'; payload: string }
   | { type: 'SET_MANUAL_TIMECODE'; payload: { isManual: boolean; startTime?: number; baseTimecode?: string } }
+  | { type: 'SET_EXTERNAL_TIMECODE'; payload: { isExternal: boolean; source?: 'ltc' | null; timecode?: string } }
+  | { type: 'SET_TIMECODE_MODE'; payload: 'auto' | 'manual' | 'external' }
+  | { type: 'EXTERNAL_TIMECODE_LOST'; payload: { fallbackMode: 'auto' | 'manual' } }
   | { type: 'SET_SELECTED_PARTICIPANTS'; payload: string[] }
   | { type: 'SET_SELECTED_LOCATION'; payload: string }
   | { type: 'SET_SELECTED_ACTION'; payload: string }
@@ -38,6 +41,11 @@ const initialState: AppState = {
   isManualTimecode: false,
   manualTimecodeStart: null,
   manualTimecodeBase: null,
+  isExternalTimecode: false,
+  externalTimecodeSource: null,
+  lastExternalTimecode: null,
+  timecodeMode: 'auto',
+  previousTimecodeMode: null,
   selectedParticipants: [],
   selectedLocation: '',
   selectedAction: '',
@@ -73,6 +81,32 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
         manualTimecodeStart: action.payload.startTime || null,
         manualTimecodeBase: action.payload.baseTimecode || null
       };
+    case 'SET_EXTERNAL_TIMECODE':
+      return {
+        ...state,
+        isExternalTimecode: action.payload.isExternal,
+        externalTimecodeSource: action.payload.source || null,
+        lastExternalTimecode: action.payload.timecode || null,
+        timecodeMode: action.payload.isExternal ? 'external' : state.previousTimecodeMode || 'auto',
+        previousTimecodeMode: action.payload.isExternal ? state.timecodeMode : state.previousTimecodeMode
+      };
+    case 'SET_TIMECODE_MODE':
+      return {
+        ...state,
+        timecodeMode: action.payload,
+        isManualTimecode: action.payload === 'manual',
+        isExternalTimecode: action.payload === 'external'
+      };
+    case 'EXTERNAL_TIMECODE_LOST':
+      return {
+        ...state,
+        isExternalTimecode: false,
+        externalTimecodeSource: null,
+        lastExternalTimecode: null,
+        timecodeMode: action.payload.fallbackMode,
+        isManualTimecode: action.payload.fallbackMode === 'manual',
+        previousTimecodeMode: null
+      };
     case 'SET_SELECTED_PARTICIPANTS':
       return { ...state, selectedParticipants: action.payload };
     case 'SET_SELECTED_LOCATION':
@@ -88,12 +122,21 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
 
 // Função para converter timecode em segundos
 const timecodeToSeconds = (timecode: string): number => {
-  const [hours, minutes, seconds, frames] = timecode.split(':').map(Number);
+  const parts = timecode.split(':').map(Number);
+  if (parts.length !== 4 || parts.some(isNaN)) {
+    console.warn('Formato de timecode inválido:', timecode);
+    return 0;
+  }
+  const [hours, minutes, seconds, frames] = parts;
   return hours * 3600 + minutes * 60 + seconds + frames / 30; // 30fps
 };
 
 // Função para converter segundos em timecode
 const secondsToTimecode = (totalSeconds: number): string => {
+  if (isNaN(totalSeconds) || totalSeconds < 0) {
+    return '00:00:00:00';
+  }
+  
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = Math.floor(totalSeconds % 60);
@@ -151,23 +194,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Timecode contínuo - automático ou manual
   useEffect(() => {
     const updateTimecode = () => {
-      if (state.isManualTimecode && state.manualTimecodeStart && state.manualTimecodeBase) {
-        // Modo manual: calcular timecode baseado no tempo decorrido desde o início manual
-        const now = Date.now();
-        const elapsedSeconds = (now - state.manualTimecodeStart) / 1000;
-        const baseSeconds = timecodeToSeconds(state.manualTimecodeBase);
-        const newTimecode = secondsToTimecode(baseSeconds + elapsedSeconds);
-        dispatch({ type: 'SET_TIMECODE', payload: newTimecode });
-      } else if (!state.isManualTimecode) {
-        // Modo automático: usar horário do sistema
+      try {
+        if (state.timecodeMode === 'external' && state.lastExternalTimecode) {
+          // Modo externo: usar o último timecode recebido
+          dispatch({ type: 'SET_TIMECODE', payload: state.lastExternalTimecode });
+        } else if (state.timecodeMode === 'manual' && state.manualTimecodeStart && state.manualTimecodeBase) {
+          // Modo manual: calcular timecode baseado no tempo decorrido
+          const now = Date.now();
+          const elapsedSeconds = (now - state.manualTimecodeStart) / 1000;
+          const baseSeconds = timecodeToSeconds(state.manualTimecodeBase);
+          const newTimecode = secondsToTimecode(baseSeconds + elapsedSeconds);
+          dispatch({ type: 'SET_TIMECODE', payload: newTimecode });
+        } else if (state.timecodeMode === 'auto') {
+          // Modo automático: usar horário do sistema
+          const now = new Date();
+          const hours = String(now.getHours()).padStart(2, '0');
+          const minutes = String(now.getMinutes()).padStart(2, '0');
+          const seconds = String(now.getSeconds()).padStart(2, '0');
+          const frames = String(Math.floor(now.getMilliseconds() / 33.33)).padStart(2, '0'); // 30fps
+          
+          const timecode = `${hours}:${minutes}:${seconds}:${frames}`;
+          dispatch({ type: 'SET_TIMECODE', payload: timecode });
+        }
+      } catch (error) {
+        console.error('Erro ao atualizar timecode:', error);
+        // Fallback para timecode do sistema em caso de erro
         const now = new Date();
         const hours = String(now.getHours()).padStart(2, '0');
         const minutes = String(now.getMinutes()).padStart(2, '0');
         const seconds = String(now.getSeconds()).padStart(2, '0');
-        const frames = String(Math.floor(now.getMilliseconds() / 33.33)).padStart(2, '0'); // 30fps
-        
-        const timecode = `${hours}:${minutes}:${seconds}:${frames}`;
-        dispatch({ type: 'SET_TIMECODE', payload: timecode });
+        const frames = String(Math.floor(now.getMilliseconds() / 33.33)).padStart(2, '0');
+        const fallbackTimecode = `${hours}:${minutes}:${seconds}:${frames}`;
+        dispatch({ type: 'SET_TIMECODE', payload: fallbackTimecode });
       }
     };
 
@@ -178,7 +236,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const interval = setInterval(updateTimecode, 33);
 
     return () => clearInterval(interval);
-  }, [state.isManualTimecode, state.manualTimecodeStart, state.manualTimecodeBase]);
+  }, [state.timecodeMode, state.isManualTimecode, state.manualTimecodeStart, state.manualTimecodeBase, state.lastExternalTimecode]);
 
   const addLogEntry = async (entry: Omit<LogEntry, 'id' | 'createdAt' | 'createdBy'>) => {
     try {
